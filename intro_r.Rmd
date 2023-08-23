@@ -1,0 +1,521 @@
+---
+title: An R Markdown document converted from "intro_r.ipynb"
+output: html_document
+---
+
+<center><img src="https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/assets/logos/SN_web_lightmode.png" width="300"></center><br/>
+
+# Assignment: Notebook for Peer Assignment
+
+Estimated time needed: 60 minutes
+
+# Assignment Scenario
+
+Congratulations! You have just been hired by a US Weather forecast firm as a data scientist.
+
+The company is considering the weather condition to help predict the possibility of precipitations, which involves using various local climatological variables, including temperature, wind speed, humidity, dew point, and pressure. The data you will be handling was collected by a NOAA weather station located at the John F. Kennedy International Airport in Queens, New York.
+
+Your task is to provide a high level analysis of weather data in JFK Airport. Your stakeholders want to understand the current and historical record of precipitations based on different variables. For now they are mainly interested in a macro-view of JFK Airport Weather, and how it relates to the possibility to rain because it will affect flight delays and etc.
+
+# Introduction
+
+This project relates to the NOAA Weather Dataset - JFK Airport (New York). The original dataset contains 114,546 hourly observations of 12 local climatological variables (such as temperature and wind speed) collected at JFK airport. This dataset can be obtained for free from the IBM Developer [Data Asset Exchange](https://developer.ibm.com/exchanges/data/all/jfk-weather-data/?utm_medium=Exinfluencer&utm_source=Exinfluencer&utm_content=000026UJ&utm_term=10006555&utm_id=NA-SkillsNetwork-Channel-SkillsNetworkCoursesIBMDA0151ENSkillsNetwork926-2022-01-01). 
+
+For this project, you will be using a subset dataset, which contains 5727 rows (about 5% or original rows) and 9 columns. The end goal will be to predict the precipitation using some of the available features. In this project, you will practice reading data files, preprocessing data, creating models, improving models and evaluating them to ultimately choose the best model.
+
+
+
+## Table of Contents:
+
+Using this R notebook you will complete **10 tasks**:
+* [0. Import Modules](#cell0)
+* [1. Download and Unzip NOAA Weather Dataset](#cell1)
+* [2. Read Dataset into Project](#cell2)
+* [3. Select Subset of Columns](#cell3)
+* [4. Clean Up Columns](#cell4)
+* [5. Convert Columns to Numerical Types](#cell5)
+* [6. Rename Columns](#cell6)
+* [7. Exploratory Data Analysis](#cell7)
+* [8. Linear Regression](#cell8)
+* [9. Improve the Model](#cell9)
+* [10. Find Best Model](#cell10)
+
+
+<a id="cell0"></a>
+## 0. Import required modules
+
+Below, install "tidymodels", additionally "rlang" should be updated in order to properly run "tidymodels". 
+
+```{r}
+# Install tidymodels if you haven't done so
+install.packages("rlang")
+install.packages("tidymodels")
+install.packages("glmnet")
+install.packages("caret")
+install.packages("gridExtra")
+```
+
+**Note: After installing the packages, restart the kernel. Without installing the packages again, load them. Tidyverse and Tidymodels will be the two main packages you will use.**
+
+```{r}
+# Library for modeling
+library(tidymodels)
+
+# Load tidyverse
+library(tidyverse)
+
+# Load glmnet
+library(glmnet)
+
+# Load caret
+library(caret)
+
+# Load gridExtra
+library(gridExtra)
+```
+
+
+### Understand the Dataset
+
+The original NOAA JFK dataset contains 114,546 hourly observations of various local climatological variables (including temperature, wind speed, humidity, dew point, and pressure). 
+
+In this project you will use a sample dataset, which is around 293 KB. [Link to the sample dataset](https://dax-cdn.cdn.appdomain.cloud/dax-noaa-weather-data-jfk-airport/1.1.4/noaa-weather-sample-data.tar.gz).
+
+The sample contains 5727 rows (about 5% or original rows) and 9 columns, which are:
+- DATE
+- HOURLYDewPointTempF
+- HOURLYRelativeHumidity
+- HOURLYDRYBULBTEMPF
+- HOURLYWETBULBTEMPF
+- HOURLYPrecip
+- HOURLYWindSpeed
+- HOURLYSeaLevelPressure
+- HOURLYStationPressure
+
+The original dataset is much bigger. Feel free to explore the original dataset. [Link to the original dataset.](https://dax-cdn.cdn.appdomain.cloud/dax-noaa-weather-data-jfk-airport/1.1.4/noaa_weather.html) 
+
+For more information about the dataset, checkout the [preview](https://dax-cdn.cdn.appdomain.cloud/dax-noaa-weather-data-jfk-airport/1.1.4/data-preview/index.html?_ga=2.176781478.281508226.1616293518-1509963377.1616117067&cm_mc_uid=90945889198916153255549&cm_mc_sid_50200000=64650651616293516933) of NOAA Weather - JFK Airport.
+
+<a id="cell1"></a>
+
+## 1. Download NOAA Weather Dataset
+
+Use the `download.file()` function to download the sample dataset from the URL below.
+
+URL = 'https://dax-cdn.cdn.appdomain.cloud/dax-noaa-weather-data-jfk-airport/1.1.4/noaa-weather-sample-data.tar.gz'
+
+```{r}
+download.file('https://dax-cdn.cdn.appdomain.cloud/dax-noaa-weather-data-jfk-airport/1.1.4/noaa-weather-sample-data.tar.gz', destfile="noaa-weather-sample-data.tar.gz")
+```
+
+Untar the zipped file.
+
+```{r}
+untar("noaa-weather-sample-data.tar.gz")
+```
+
+<a id="cell2"></a>
+## 2. Extract and Read into Project
+We start by reading in the raw dataset. You should specify the file name as "noaa-weather-sample-data/jfk_weather_sample.csv".
+
+```{r}
+weather<- read_csv("noaa-weather-sample-data/jfk_weather_sample.csv")
+```
+
+Next, display the first few rows of the dataframe.
+
+```{r}
+head(weather)
+```
+
+Also, take a `glimpse` of the dataset to see the different column data types and make sure it is the correct subset dataset with about 5700 rows and 9 columns.
+
+```{r}
+glimpse(weather)
+```
+
+<a id="cell3"></a>
+## 3. Select Subset of Columns
+
+The end goal of this project will be to predict `HOURLYprecip` (precipitation) using a few other variables. Before you can do this, you first need to preprocess the dataset. Section 3 to section 6 focuses on preprocessing.
+
+The first step in preprocessing is to select a subset of data columns and inspect the column types.
+
+The key columns that we will explore in this project are:
+- HOURLYRelativeHumidity
+- HOURLYDRYBULBTEMPF
+- HOURLYPrecip
+- HOURLYWindSpeed
+- HOURLYStationPressure
+
+Data Glossary:
+- 'HOURLYRelativeHumidity' is the relative humidity given to the nearest whole percentage.
+- 'HOURLYDRYBULBTEMPF' is the dry-bulb temperature and is commonly used as the standard air temperature reported. It is given here in whole degrees Fahrenheit.
+- 'HOURLYPrecip' is the amount of precipitation in inches to hundredths over the past hour. For certain automated stations, precipitation will be reported at sub-hourly intervals (e.g. every 15 or 20 minutes) as an accumulated amount of all precipitation within the preceding hour. A “T” indicates a trace amount of precipitation.
+- 'HOURLYWindSpeed' is the speed of the wind at the time of observation given in miles per hour (mph).
+- 'HOURLYStationPressure' is the atmospheric pressure observed at the station during the time of observation. Given in inches of Mercury (in Hg).
+
+`Select` those five columns and store the modified dataframe as a new variable.
+
+```{r}
+weather.sub<- weather %>% select(HOURLYRelativeHumidity, HOURLYDRYBULBTEMPF, HOURLYPrecip, HOURLYWindSpeed, HOURLYStationPressure)
+```
+
+Show the first 10 rows of this new dataframe.
+
+```{r}
+head(weather.sub, 10)
+```
+
+<a id="cell4"></a>
+## 4. Clean Up Columns
+
+From the dataframe preview above, we can see that the column `HOURLYPrecip` - which is the hourly measure of precipitation levels - contains both `NA` and `T` values. `T` specifies *trace amounts of precipitation* (meaning essentially no precipitation), while `NA` means *not available*, and is used to denote missing values. Additionally, some values also have "s" at the end of them, indicating that the precipitation was snow. 
+
+Inspect the unique values present in the column `HOURLYPrecip` (with `unique(dataframe$column)`) to see these values.
+
+```{r}
+unique(weather.sub$HOURLYPrecip)
+```
+
+Having characters in values (like the "T" and "s" that you see in the unique values) will cause problems when you create a model because values for precipitation should be numerical. So you need to fix these values that have characters. 
+
+Now, for the column `HOURLYPrecip`:
+1. Replace all the `T` values with "0.0" and 
+2. Remove "s" from values like "0.02s". In R, you can use the method `str_remove(column, pattern = "s$")` to remove the character "s" from the end of values. The "$" tells R to match to the end of values. The `pattern` is a regex pattern. Look at [here](https://www.rdocumentation.org/packages/stringi/versions/1.5.3/topics/about_search_regex?utm_medium=Exinfluencer&utm_source=Exinfluencer&utm_content=000026UJ&utm_term=10006555&utm_id=NA-SkillsNetwork-Channel-SkillsNetworkCoursesIBMDA0151ENSkillsNetwork926-2022-01-01) for more information about regex and matching to strings in R.
+
+Remember that you can use `tidyverse`'s  `mutate()` to update columns.
+
+You can check your work by checking if unique values of `HOURLYPrecip` still contain any `T` or `s`. Store the modified dataframe as a new variable.
+
+```{r}
+# replace all "T" values with 0.0
+weather.sub$HOURLYPrecip<- ifelse(weather.sub$HOURLYPrecip=="T", 0.0, weather.sub$HOURLYPrecip)
+
+# look for "s" at the end of values and remove them
+weather.sub$HOURLYPrecip<- str_remove(weather.sub$HOURLYPrecip, pattern = "s$")
+
+# check final data
+unique(weather.sub$HOURLYPrecip)
+```
+
+<a id="cell5"></a>
+## 5. Convert Columns to Numerical Types
+Now that you have removed the characters in the `HOURLYPrecip` column, you can safely covert the column to a numeric type.
+
+First, check the types of the columns. You will notice that all are `dbl` (double or numeric) except for `HOURLYPrecip`, which is `chr` (character or string). Use the `glimpse` function from Tidyverse.
+
+```{r}
+glimpse(weather.sub)
+```
+
+Convert `HOURLYPrecip` to the `numeric` type and store the cleaned dataframe as a new variable.
+
+```{r}
+weather.sub<- weather.sub %>% 
+  select(1:5) %>% 
+  mutate_all(type.convert, as.is=TRUE) %>% 
+  mutate_if(is.character, as.numeric)
+```
+
+We can now see that all fields have numerical data type.
+
+```{r}
+glimpse(weather.sub)
+```
+
+<a id="cell6"></a>
+## 6. Rename Columns
+Let's rename the following columns as:
+- 'HOURLYRelativeHumidity' to 'relative_humidity'
+- 'HOURLYDRYBULBTEMPF' to 'dry_bulb_temp_f'
+- 'HOURLYPrecip' to 'precip'
+- 'HOURLYWindSpeed' to 'wind_speed'
+- 'HOURLYStationPressure' to 'station_pressure'
+
+You can use `dplyr::rename()`. Then, store the final dataframe as a new variable.
+
+```{r}
+weather.rename<- weather.sub %>%
+        dplyr::rename("relative_humidity" = "HOURLYRelativeHumidity",
+                     "dry_bulb_temp_f" = "HOURLYDRYBULBTEMPF",
+                     "precip" = "HOURLYPrecip",
+                     "wind_speed" = "HOURLYWindSpeed",
+                     "station_pressure" = "HOURLYStationPressure")
+
+glimpse(weather.rename)
+```
+
+<a id="cell7"></a>
+## 7. Exploratory Data Analysis
+Now that you have finished preprocessing the dataset, you can can start exploring the columns more.
+
+First, split the data into a training and testing set. Splitting a dataset is done randomly, so to have reproducible results set the seed = 1234. Also, use 80% of the data for training.
+
+```{r}
+set.seed(1234)
+
+weather.complete <- weather.rename[complete.cases(weather.rename), ]
+
+weather.split<- initial_split(weather.complete, prop=0.8)
+
+train.data<- training(weather.split)
+test.data<- testing(weather.split)
+```
+
+Next, looking at just the **training set**, plot histograms or box plots of the variables (`relative_humidity`, `dry_bulb_temp_f`, `precip`, `wind_speed`,  `station_pressure`) for an intial look of their distributions using `tidyverse`'s `ggplot`. Leave the testing set as is because it is good practice to not see the testing set until evaluating the final model.
+
+```{r}
+p1<- ggplot(train.data) +
+geom_bar(aes(x=relative_humidity))
+
+p2<- ggplot(train.data) +
+geom_bar(aes(x=dry_bulb_temp_f))
+
+p3<- ggplot(train.data) +
+geom_bar(aes(x=precip))
+
+p4<- ggplot(train.data) +
+geom_bar(aes(x=wind_speed))
+
+p5<- ggplot(train.data) +
+geom_bar(aes(x=station_pressure))
+
+grid.arrange(p1, p2, p3, p4, p5, nrow=3)
+```
+
+<a id="cell8"></a>
+## 8. Linear Regression 
+After exploring the dataset more, you are now ready to start creating models to predict the precipitation (`precip`).
+
+Create simple linear regression models where `precip` is the response variable and each of `relative_humidity`, `dry_bulb_temp_f`,`wind_speed` or `station_pressure` will be a predictor variable, e.g. `precip ~ relative_humidity`, `precip ~ dry_bulb_temp_f`, etc. for a total of four simple models. 
+Additionally, visualize each simple model with a scatter plot.
+
+```{r}
+relhum.mod<- lm(precip ~ relative_humidity, data=train.data)
+
+
+p6<- ggplot(train.data, aes(x=relative_humidity, y=precip)) +
+geom_point() +
+stat_smooth(aes(x=relative_humidity, y=precip), method="lm")
+```
+
+```{r}
+drybulb.mod<- lm(precip ~ dry_bulb_temp_f, data=train.data)
+
+p7<- ggplot(train.data, aes(x=dry_bulb_temp_f, y=precip)) +
+geom_point() +
+stat_smooth(aes(x=dry_bulb_temp_f, y=precip), method="lm")
+```
+
+```{r}
+wind.mod<- lm(precip ~ wind_speed, data=train.data)
+
+p8<- ggplot(train.data, aes(x=wind_speed, y=precip)) +
+geom_point() +
+stat_smooth(aes(x=wind_speed, y=precip), method="lm")
+```
+
+```{r}
+bp.mod<- lm(precip ~ station_pressure, data=train.data)
+
+p9<- ggplot(train.data, aes(x=station_pressure, y=precip)) +
+geom_point() +
+stat_smooth(aes(x=station_pressure, y=precip), method="lm")
+
+grid.arrange(p6, p7, p8, p9, nrow=2)
+```
+
+<a id="cell9"></a>
+## 9. Improve the Model
+Now, try improving the simple models you created in the previous section. 
+
+Create at least two more models, each model should use at least one of the different techniques:
+1. Add more features/predictors
+2. Add regularization (L1, L2 or a mix)
+3. Add a polynomial component
+
+Also, for each of the models you create, check the model performance using the **training set** and a metric like MSE, RMSE, or R-squared.
+
+Consider using `tidymodels` if you choose to add regularization and tune lambda.
+
+```{r}
+# multiple linear regression using relative humidity & dry bulb temperature as predictors
+
+lm_spec<- linear_reg() %>%
+            set_engine(engine="lm")
+
+train_fit<- lm_spec %>%
+            fit(precip ~ relative_humidity + station_pressure, data=train.data)
+
+ggplot(train.data, aes(x=relative_humidity, y=precip, color=station_pressure)) +
+geom_point(size=3) +
+stat_smooth(aes(x=relative_humidity, y=precip, color=station_pressure), color="red", method="lm")
+
+hum_temp_results<- train_fit %>% 
+  predict(new_data=test.data) %>%
+  mutate(truth=test.data$precip)
+
+rmse(hum_temp_results, truth=truth, estimate=.pred)
+rsq(hum_temp_results, truth=truth, estimate=.pred)
+
+
+
+
+# First, we need a recipe for our model formula
+precip_recipe<- recipe(precip~., data=train.data)
+
+# First, we need to define our model and engine
+tune_spec<- linear_reg(penalty=tune(),   # we want to tune the lambda
+                       mixture=1) %>%    # mixture = 1 for Lasso
+  set_engine("glmnet")
+
+# We will use cross-validation to resample the data during training
+precip_cvfolds<- vfold_cv(train.data)
+
+# Now we need to set up our "grid" for tuning
+lambda_grid<- grid_regular(levels = 50,               # test 50 values
+                           penalty(range=c(-3, 0.3))) # between -3 and 0.3
+# by default, penalty is inverse-log transformed, so range = 10e-3 to 10e0.3
+
+# We also need to create our new workflow for the lasso regression
+lasso_wf<- workflow() %>% 
+  add_recipe(precip_recipe)
+
+# Now we can let the model tuning begin
+lasso_grid<- tune_grid(lasso_wf %>% add_model(tune_spec),
+                       resamples = precip_cvfolds,
+                       grid = lambda_grid)
+
+
+# Let's look at the best fitting models
+show_best(lasso_grid, metric="rmse")
+
+# Now we can visualize the rmse data
+lasso_grid %>%
+  collect_metrics() %>%
+  filter(.metric == "rmse") %>%
+  ggplot(aes(penalty, mean)) +
+  geom_line(linewidth=1, color="red") +
+  scale_x_log10() +
+  ggtitle("RMSE")
+```
+
+<a id="cell10"></a>
+## 10. Find Best Model
+Compare the regression metrics of each model from section 9 to find the best model overall. To do this, 
+
+1. Evaluate the models on the **testing set** using at least one metric (like MSE, RMSE or R-squared).
+2. After calculating the metrics on the testing set for each model, print them out in as a table to easily compare. You can use something like:
+```
+model_names <- c("model_1", "model_2", "model_3")
+train_error <- c("model_1_value", "model_2_value", "model_3_value")
+test_error <- c("model_1_value", "model_2_value", "model_3_value")
+comparison_df <- data.frame(model_names, train_error, test_error)
+```
+3. Finally, from the comparison table you create, conclude which model performed the best.
+
+```{r}
+### Simple Linear Regression
+# Model setup
+lm_spec<- linear_reg() %>%    # Pick linear regression
+  set_engine(engine = "lm")   # Set engine
+lm_spec
+
+# Fit our model with the training data set
+bp_fit<- lm_spec %>% 
+  fit(precip ~ station_pressure, data=train.data)
+bp_fit
+
+# Test the model using our testing data set
+bp_test_results<- bp_fit %>% 
+  predict(new_data=test.data) %>%   # Make predictions
+  mutate(truth=test.data$precip)
+
+# Get predictions from the model using the training data set
+#      This is just for comparison sake
+bp_train_results<- train_fit %>% 
+  predict(new_data=train.data) %>%   # Make predictions
+  mutate(truth=train.data$precip)
+
+# Get the model performance metrics
+rmse(bp_train_results, truth=truth, estimate=.pred)
+rmse(bp_test_results, truth=truth, estimate=.pred)
+
+rsq(bp_train_results, truth=truth, estimate=.pred)
+rsq(bp_test_results, truth=truth, estimate=.pred)
+
+
+### Multiple Linear Regression
+# Fit our model with the training data set
+bp_mult<- lm_spec %>% 
+  fit(precip ~ station_pressure + relative_humidity, data=train.data)
+bp_mult
+
+# Test the model using our testing data set
+bpMult_test_results<- bp_mult %>% 
+  predict(new_data=test.data) %>%   # Make predictions
+  mutate(truth=test.data$precip)
+
+# Get predictions from the model using the training data set
+#     This is just for comparison sake
+bpMult_train_results<- bp_mult %>% 
+  predict(new_data=train.data) %>%   # Make predictions
+  mutate(truth=train.data$precip)
+
+# Get the model performance metrics
+rmse(bpMult_train_results, truth=truth, estimate=.pred)
+rmse(bpMult_test_results, truth=truth, estimate=.pred)
+
+
+### Lasso Regulation
+# Now we need to specify our model and engine
+lasso_spec<- linear_reg(penalty = 0.001, mixture = 1) %>% 
+  set_engine("glmnet")  # this engine requires the "glmnet" package
+
+
+# Next, let's create our workflow for pre-/post-processing, if needed
+lasso_wf<- workflow() %>% 
+  add_recipe(precip_recipe)
+
+# Now we can add/fit the model
+lasso_fit<- lasso_wf %>% 
+  add_model(lasso_spec) %>% 
+  fit(data=train.data)
+
+lasso_train_predictions <- predict(lasso_fit,
+                            new_data = train.data)
+
+lasso_train_results <- train.data %>%  
+  bind_cols(lasso_train_predictions)
+
+lasso_train_results %>%
+rmse(truth = precip, estimate = .pred)
+
+lasso_predictions <- predict(lasso_fit,
+                            new_data = test.data)
+
+lasso_test_results <- test.data %>%  
+  bind_cols(lasso_predictions)
+
+lasso_test_results %>%
+rmse(truth = precip, estimate = .pred)
+
+model_names <- c("BP SLR", "BP/Hum MLR", "Lasso Regulation")
+train_error <- c("0.044", "0.044", "0.044")
+test_error <- c("0.022", "0.022", "0.022")
+data.frame(model_names, train_error, test_error)
+
+print("All models showed similar performance between training and testing data; therefore, the simplest model (Barometric Pressure Simple Linear Regression) is the best model of the three.")
+```
+
+## Author(s)
+
+<h4> Yiwen Li </h4>
+
+## Contributions
+
+<h4> Tiffany Zhu </h4>
+
+## <h3 align="center"> © IBM Corporation 2021. All rights reserved. <h3/>
+
